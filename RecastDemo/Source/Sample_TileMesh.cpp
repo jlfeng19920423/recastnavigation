@@ -249,11 +249,23 @@ void Sample_TileMesh::handleSettings()
 		snprintf(text, 64, "Tiles  %d x %d", tw, th);
 		imguiValue(text);
 
+		// 32位模式下的原始逻辑
+		const int totalBits = 22;
+		const int maxTileBits = 14;
+
+
 		// Max tiles and max polys affect how the tile IDs are caculated.
 		// There are 22 bits available for identifying a tile and a polygon.
-		int tileBits = rcMin((int)ilog2(nextPow2(tw*th)), 14);
-		if (tileBits > 14) tileBits = 14;
-		int polyBits = 22 - tileBits;
+		int tileBits = rcMin((int)ilog2(nextPow2(tw * th)), maxTileBits);
+
+		if (tileBits > maxTileBits) tileBits = maxTileBits;
+		int polyBits = totalBits - tileBits;
+#ifdef DT_POLYREF64
+		// 64位模式下，我们通常预留 32 位给 Salt，剩下 32 位给 Tile 和 Poly
+		// 这比原来的 22 位多出了 1024 倍的空间
+		tileBits = 20;
+		polyBits = 28;
+#endif	
 		m_maxTiles = 1 << tileBits;
 		m_maxPolysPerTile = 1 << polyBits;
 		snprintf(text, 64, "Max Tiles  %d", m_maxTiles);
@@ -895,8 +907,8 @@ unsigned char* Sample_TileMesh::buildTileMesh(const int tx, const int ty, const 
 	tbmin[1] = m_cfg.bmin[2];
 	tbmax[0] = m_cfg.bmax[0];
 	tbmax[1] = m_cfg.bmax[2];
-	int cid[512];// TODO: Make grow when returning too many items.
-	const int ncid = rcGetChunksOverlappingRect(chunkyMesh, tbmin, tbmax, cid, 512);
+	int cid[4096];// TODO: Make grow when returning too many items.
+	const int ncid = rcGetChunksOverlappingRect(chunkyMesh, tbmin, tbmax, cid, 4096);
 	if (!ncid)
 		return 0;
 	
@@ -1151,6 +1163,9 @@ unsigned char* Sample_TileMesh::buildTileMesh(const int tx, const int ty, const 
 		params.ch = m_cfg.ch;
 		params.buildBvTree = true;
 		
+		fprintf(stderr, "polyCount:%d\n", params.polyCount);
+		fprintf(stderr, "vertCount:%d\n", params.vertCount);
+
 		if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
 		{
 			m_ctx->log(RC_LOG_ERROR, "Could not build Detour navmesh.");
