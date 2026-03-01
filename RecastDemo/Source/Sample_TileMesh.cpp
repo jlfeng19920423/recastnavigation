@@ -226,29 +226,42 @@ void Sample_TileMesh::drawSettingsUI()
 		tileSize = static_cast<int>(roundf(static_cast<float>(tileSize) / 16.0f)) * 16;
 	}
 
-		// 32λģʽ�µ�ԭʼ�߼�
+	if (inputGeometry)
+	{
+		const float* navMeshBoundsMin = inputGeometry->getNavMeshBoundsMin();
+		const float* navMeshBoundsMax = inputGeometry->getNavMeshBoundsMax();
+		int gridWidth = 0;
+		int gridHeight = 0;
+		rcCalcGridSize(navMeshBoundsMin, navMeshBoundsMax, cellSize, &gridWidth, &gridHeight);
+		const int tileWidth = (gridWidth + tileSize - 1) / tileSize;
+		const int tileHeight = (gridHeight + tileSize - 1) / tileSize;
+
+		ImGui::Text("Tiles  %d x %d", tileWidth, tileHeight);
+
+
+
 		const int totalBits = 22;
 		const int maxTileBits = 14;
+		
+		// Max tiles and max polys affect how the tile IDs are calculated.
+	    // There are 22 bits available for identifying a tile and a polygon.
+		int tileBits = rcMin(static_cast<int>(ilog2(nextPow2(tileWidth * tileHeight))), maxTileBits);
+		if (tileBits > maxTileBits)
+		{
+			tileBits = maxTileBits;
+		}
 
-
-		// Max tiles and max polys affect how the tile IDs are caculated.
-		// There are 22 bits available for identifying a tile and a polygon.
-		int tileBits = rcMin((int)ilog2(nextPow2(tw * th)), maxTileBits);
-
-		if (tileBits > maxTileBits) tileBits = maxTileBits;
+		tileBits = rcMin(tileBits, maxTileBits);
 		int polyBits = totalBits - tileBits;
+
 #ifdef DT_POLYREF64
-		// 64λģʽ�£�����ͨ��Ԥ�� 32 λ�� Salt��ʣ�� 32 λ�� Tile �� Poly
-		// ���ԭ���� 22 λ����� 1024 ���Ŀռ�
 		tileBits = 20;
 		polyBits = 28;
 #endif	
-		m_maxTiles = 1 << tileBits;
-		m_maxPolysPerTile = 1 << polyBits;
-		snprintf(text, 64, "Max Tiles  %d", m_maxTiles);
-		imguiValue(text);
-		snprintf(text, 64, "Max Polys  %d", m_maxPolysPerTile);
-		imguiValue(text);
+		maxTiles = 1 << tileBits;
+		maxPolysPerTile = 1 << polyBits;
+		ImGui::Text("Max Tiles  %d", maxTiles);
+		ImGui::Text("Max Polys  %d", maxPolysPerTile);
 	}
 	else
 	{
